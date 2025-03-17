@@ -91,16 +91,19 @@ const TemplateCreator: React.FC = () => {
       
       if (creationMode === 'single') {
         // Single template creation
+        // Wrap parameters in a params object to match Rust function signature
         await invoke('create_template', {
-          templateName,
-          appId,
-          content: bodyText,
-          category: templateType.toUpperCase(),
-          templateType: headerType === 'image' ? 'IMAGE' : 'TEXT',
-          vertical,
-          headerText: headerType === 'text' ? headerText : undefined,
-          imageData: headerType === 'image' ? imageData : undefined,
-          imageName: headerType === 'image' ? imageName : undefined
+          params: {
+            template_name: templateName,
+            app_id: appId,
+            content: bodyText,
+            category: templateType.toUpperCase(),
+            template_type: headerType === 'image' ? 'IMAGE' : 'TEXT',
+            vertical,
+            header_text: headerType === 'text' ? headerText : undefined,
+            image_data: headerType === 'image' ? imageData : undefined,
+            image_name: headerType === 'image' ? imageName : undefined
+          }
         });
         
         alert("Template criado com sucesso!");
@@ -109,14 +112,16 @@ const TemplateCreator: React.FC = () => {
         setIsProcessing(true);
         
         const result = await invoke<BulkResult>('create_template_for_all_connections', {
-          templateName,
-          content: bodyText,
-          category: templateType.toUpperCase(),
-          templateType: headerType === 'image' ? 'IMAGE' : 'TEXT',
-          vertical,
-          headerText: headerType === 'text' ? headerText : undefined,
-          imageData: headerType === 'image' ? imageData : undefined,
-          imageName: headerType === 'image' ? imageName : undefined
+          params: {
+            template_name: templateName,
+            content: bodyText,
+            category: templateType.toUpperCase(),
+            template_type: headerType === 'image' ? 'IMAGE' : 'TEXT',
+            vertical,
+            header_text: headerType === 'text' ? headerText : undefined,
+            image_data: headerType === 'image' ? imageData : undefined,
+            image_name: headerType === 'image' ? imageName : undefined
+          }
         });
         
         setBulkResult(result);
