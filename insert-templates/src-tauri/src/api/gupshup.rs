@@ -128,7 +128,6 @@ impl GupshupClient {
             .await
             .map_err(|e| format!("Request error: {}", e))?;
         
-        // If response is not successful, return the error text
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await
@@ -138,7 +137,6 @@ impl GupshupClient {
             return Err(format!("HTTP error {}: {}", status, error_text));
         }
 
-        // Parse the response
         let media_response = response.json::<MediaResponse>().await
             .map_err(|e| format!("Error parsing response: {}", e))?;
         
@@ -158,7 +156,6 @@ impl GupshupClient {
             let media_response = self.upload_media(app_id, &file_name, data).await?;
             
             if media_response.status != "success" {
-                // Create a descriptive error message
                 let error_msg = media_response.media
                     .map_or("Unknown error".to_string(), 
                     |m| format!("Error with file {}", m.file_name));

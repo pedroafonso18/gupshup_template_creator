@@ -48,7 +48,6 @@ const TemplateCreator: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate form data
     if (!templateName.trim()) {
       alert("Por favor insira o nome do template");
       return;
@@ -69,7 +68,6 @@ const TemplateCreator: React.FC = () => {
       return;
     }
     
-    // In single mode, app_id is required
     if (creationMode === 'single' && !appId.trim()) {
       alert("Por favor insira o App ID");
       return;
@@ -79,7 +77,6 @@ const TemplateCreator: React.FC = () => {
       setIsSubmitting(true);
       setBulkResult(null);
       
-      // Prepare image data if needed
       let imageData = null;
       let imageName = null;
       
@@ -90,8 +87,6 @@ const TemplateCreator: React.FC = () => {
       }
       
       if (creationMode === 'single') {
-        // Single template creation
-        // Wrap parameters in a params object to match Rust function signature
         await invoke('create_template', {
           params: {
             template_name: templateName,
@@ -108,7 +103,6 @@ const TemplateCreator: React.FC = () => {
         
         alert("Template criado com sucesso!");
       } else {
-        // Bulk template creation
         setIsProcessing(true);
         
         const result = await invoke<BulkResult>('create_template_for_all_connections', {
@@ -137,9 +131,7 @@ const TemplateCreator: React.FC = () => {
     }
   };
 
-  // Function to display formatted message preview with variables
   const formatPreviewText = (text: string) => {
-    // Replace {{name}} with "John" and {{date}} with current date for preview
     return text
       .replace(/\{\{name\}\}/g, "John")
       .replace(/\{\{date\}\}/g, new Date().toLocaleDateString());
