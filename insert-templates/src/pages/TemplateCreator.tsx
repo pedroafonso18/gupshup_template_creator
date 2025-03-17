@@ -325,7 +325,7 @@ const TemplateCreator: React.FC = () => {
               </div>
             )}
 
-            <div className="form-actions"></div>
+            <div className="form-actions">
               <button 
                 type="submit" 
                 className="send-button" 
@@ -346,11 +346,11 @@ const TemplateCreator: React.FC = () => {
           <h2>Preview</h2>
           <div className="template-preview">
             {templateName && (
-              <div className="template-name-badge"></div>
+              <div className="template-name-badge">
                 {templateName}
               </div>
             )}
-            <div className="phone-mockup"></div>
+            <div className="phone-mockup">
               <div className="phone-screen">
                 <div className="message-bubble">
                   {headerType === 'image' && headerImage && (
@@ -363,7 +363,7 @@ const TemplateCreator: React.FC = () => {
                     <div className="message-header-text">{headerText}</div>
                   )}
                   
-                  <div className="message-body"></div>
+                  <div className="message-body">
                     {bodyText ? formatPreviewText(bodyText) : 'Sua mensagem vai aparecer aqui'}
                   </div>
                 </div>

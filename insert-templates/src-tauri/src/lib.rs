@@ -143,13 +143,11 @@ async fn create_template(params: CreateTemplateParams) -> Result<String, String>
     let result = if let Some(image_data) = params.image_data {
         // If image data is provided, upload it and create template
         client.create_template_with_image(&params.app_id, template_request, Some(image_data), params.image_name)
-            .await
-            .map_err(|e| format!("Failed to create template with image: {}", e))?
+            .await?
     } else {
         // Otherwise create template without uploading image
         client.create_template(&params.app_id, template_request)
-            .await
-            .map_err(|e| format!("Failed to create template: {}", e))?
+            .await?
     };
     
     match result.status.as_str() {

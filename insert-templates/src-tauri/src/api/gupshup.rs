@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::io::{Error as IoError, ErrorKind};
 use bytes::Bytes;
 use std::io::Cursor;
+use std::fmt;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum TemplateCategory {
@@ -109,12 +110,13 @@ impl GupshupClient {
         }
     }
 
-    pub async fn upload_media(&self, app_id: &str, file_name: &str, file_data: Vec<u8>) -> Result<MediaResponse, ReqwestError> {
+    pub async fn upload_media(&self, app_id: &str, file_name: &str, file_data: Vec<u8>) -> Result<MediaResponse, String> {
         let url = format!("https://api.gupshup.io/wa/api/v1/app/{}/media", app_id);
         
         let part = reqwest::multipart::Part::bytes(file_data)
             .file_name(file_name.to_string())
-            .mime_str("image/jpeg")?;
+            .mime_str("image/jpeg")
+            .map_err(|e| format!("MIME error: {}", e))?;
         
         let form = reqwest::multipart::Form::new().part("file", part);
 
@@ -123,40 +125,45 @@ impl GupshupClient {
             .header("Cookie", format!("session={}", self.session_cookie))
             .multipart(form)
             .send()
-            .await?;
+            .await
+            .map_err(|e| format!("Request error: {}", e))?;
         
+        // If response is not successful, return the error text
         if !response.status().is_success() {
-            let error_text = response.text().await?;
+            let status = response.status();
+            let error_text = response.text().await
+                .map_err(|e| format!("Error reading response: {}", e))?;
+            
             println!("Error uploading media: {}", error_text);
-            // Create a proper error
-            let io_err = IoError::new(ErrorKind::Other, format!("HTTP error: {}", error_text));
-            return Err(ReqwestError::new(io_err.into()));
+            return Err(format!("HTTP error {}: {}", status, error_text));
         }
 
-        let media_response = response.json::<MediaResponse>().await?;
+        // Parse the response
+        let media_response = response.json::<MediaResponse>().await
+            .map_err(|e| format!("Error parsing response: {}", e))?;
+        
         Ok(media_response)
     }
 
-    pub async fn create_template_with_image(&self, 
-                                          app_id: &str, 
-                                          mut template: TemplateRequest, 
-                                          image_data: Option<Vec<u8>>,
-                                          image_name: Option<String>) -> Result<GupshupResponse, ReqwestError> {
+    pub async fn create_template_with_image(
+        &self, 
+        app_id: &str, 
+        mut template: TemplateRequest, 
+        image_data: Option<Vec<u8>>,
+        image_name: Option<String>
+    ) -> Result<GupshupResponse, String> {
         if let Some(data) = image_data {
             let file_name = image_name.unwrap_or_else(|| "image.jpg".to_string());
             
             let media_response = self.upload_media(app_id, &file_name, data).await?;
             
             if media_response.status != "success" {
-                // Create a proper error message
+                // Create a descriptive error message
                 let error_msg = media_response.media
                     .map_or("Unknown error".to_string(), 
                     |m| format!("Error with file {}", m.file_name));
                 
-                let io_err = IoError::new(ErrorKind::Other, 
-                    format!("Failed to upload media: {}", error_msg));
-                
-                return Err(ReqwestError::new(io_err.into()));
+                return Err(format!("Failed to upload media: {}", error_msg));
             }
             
             if let Some(media_details) = media_response.media {
@@ -167,7 +174,7 @@ impl GupshupClient {
         self.create_template(app_id, template).await
     }
 
-    pub async fn create_template(&self, app_id: &str, template: TemplateRequest) -> Result<GupshupResponse, ReqwestError> {
+    pub async fn create_template(&self, app_id: &str, template: TemplateRequest) -> Result<GupshupResponse, String> {
         let url = format!("{}/{}/template", self.base_url, app_id);
         
         let mut form = HashMap::new();
@@ -209,9 +216,12 @@ impl GupshupClient {
             .header("Cookie", format!("session={}", self.session_cookie))
             .form(&form)
             .send()
-            .await?;
+            .await
+            .map_err(|e| format!("Request error: {}", e))?;
 
-        let gupshup_response = response.json::<GupshupResponse>().await?;
+        let gupshup_response = response.json::<GupshupResponse>().await
+            .map_err(|e| format!("Error parsing response: {}", e))?;
+        
         Ok(gupshup_response)
     }
 }
