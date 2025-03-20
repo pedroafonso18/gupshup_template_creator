@@ -51,6 +51,7 @@ struct ConnectionsCompleteResult {
 
 #[tauri::command]
 async fn fetch_all_connections_data(params: Params) -> Result<Vec<ConnectionsCompleteResult>, String> {
+    println!("Starting fetch_all_connections_data");
     let mut env = load();
     if let Some(db_url) = params.db_url {
         if !db_url.is_empty() {
@@ -58,15 +59,25 @@ async fn fetch_all_connections_data(params: Params) -> Result<Vec<ConnectionsCom
         }
     }
 
-    let private_client = connect::connect_db(&env.db_url)
+    println!("Connecting to database with URL: {}", env.db_url);
+    let mut db_conn = connect::connect_db(&env.db_url)
         .await
-        .map_err(|e| format!("Failed to connect to DB: {}", e))?;
+        .map_err(|e| {
+            println!("Database connection error: {}", e);
+            format!("Failed to connect to DB: {}", e)
+        })?;
 
-    let data = fetch::fetch_connections(&private_client)
+    println!("Connection successful, fetching data...");
+    let data = fetch::fetch_connections(&mut db_conn)
         .await
-        .map_err(|e| format!("Failed to fetch connections: {}", e))?;
+        .map_err(|e| {
+            println!("Error fetching connections: {}", e);
+            format!("Failed to fetch connections: {}", e)
+        })?;
 
-    let results = data.into_iter().map(|item| { ConnectionsCompleteResult {
+    println!("Fetched {} connections", data.len());
+
+    let results: Vec<ConnectionsCompleteResult> = data.into_iter().map(|item| { ConnectionsCompleteResult {
             id: item.id,
             source_name: item.source_name,
             disparos_dia: item.disparos_dia,
@@ -80,6 +91,8 @@ async fn fetch_all_connections_data(params: Params) -> Result<Vec<ConnectionsCom
             facebook_token: item.facebook_token,
         }
     }).collect();
+    
+    println!("Returning {} connection results", results.len());
     Ok(results)
 }
 
@@ -100,6 +113,7 @@ struct CreateTemplateParams {
 
 #[tauri::command]
 async fn create_template(params: CreateTemplateParams) -> Result<String, String> {
+    println!("Starting create_template for app_id: {}", params.app_id);
     let env = load();
     
     let category = match params.category.as_str() {
@@ -137,13 +151,20 @@ async fn create_template(params: CreateTemplateParams) -> Result<String, String>
         template_request
     };
     
+    println!("Creating template '{}' of type {} for app_id {}", 
+        params.template_name, params.template_type, params.app_id);
+    
     let result = if let Some(image_data) = params.image_data {
+        println!("Template has image, image size: {} bytes", image_data.len());
         client.create_template_with_image(&params.app_id, template_request, Some(image_data), params.image_name)
             .await?
     } else {
+        println!("Creating text-only template");
         client.create_template(&params.app_id, template_request)
             .await?
     };
+    
+    println!("Template creation result: {}", result.status);
     
     match result.status.as_str() {
         "success" => Ok("Template created successfully".to_string()),
@@ -174,19 +195,31 @@ struct BulkCreateResult {
 async fn create_template_for_all_connections(
     params: BulkCreateTemplateParams
 ) -> Result<BulkCreateResult, String> {
+    println!("Starting create_template_for_all_connections");
     let env = load();
     
-    let db_client = connect::connect_db(&env.db_url)
+    println!("Connecting to database to retrieve connections");
+    let mut db_conn = connect::connect_db(&env.db_url)
         .await
-        .map_err(|e| format!("Failed to connect to DB: {}", e))?;
+        .map_err(|e| {
+            println!("Database connection error: {}", e);
+            format!("Failed to connect to DB: {}", e)
+        })?;
     
-    let connections = fetch::fetch_connections(&db_client)
+    println!("Fetching connections from database");
+    let connections = fetch::fetch_connections(&mut db_conn)
         .await
-        .map_err(|e| format!("Failed to fetch connections: {}", e))?;
+        .map_err(|e| {
+            println!("Error fetching connections: {}", e);
+            format!("Failed to fetch connections: {}", e)
+        })?;
     
+    println!("Found {} total connections", connections.len());
     let connections_with_app_id: Vec<_> = connections.into_iter()
         .filter(|conn| conn.app_id.is_some() && !conn.app_id.as_ref().unwrap().is_empty())
         .collect();
+    
+    println!("Found {} connections with valid app_id", connections_with_app_id.len());
     
     if connections_with_app_id.is_empty() {
         return Err("No connections found with valid app_id".to_string());
@@ -210,8 +243,14 @@ async fn create_template_for_all_connections(
     let total = connections_with_app_id.len();
     let mut successful_app_ids = Vec::new();
     
-    for connection in connections_with_app_id {
-        let app_id = connection.app_id.unwrap();
+    println!("Starting template creation for {} connections", connections_with_app_id.len());
+    
+    let mut skipped = 0;
+    let mut skipped_app_ids = Vec::new();
+    
+    for (index, connection) in connections_with_app_id.iter().enumerate() {
+        let app_id = connection.app_id.as_ref().unwrap();
+        println!("[{}/{}] Processing app_id: {}", index + 1, total, app_id);
 
         let template_request = TemplateRequest::new(
             &params.template_name,
@@ -244,16 +283,30 @@ async fn create_template_for_all_connections(
         };
         
         if result.status != "success" {
+            // Check if the error is about an existing template
+            let error_message = result.message.unwrap_or("Unknown error".to_string());
+            if error_message.contains("Template Already exists with same namespace and elementName and languageCode") {
+                println!("Template already exists for app_id: {}, skipping", app_id);
+                skipped += 1;
+                skipped_app_ids.push(app_id.clone());
+                continue; // Skip to the next connection
+            }
+            
+            // For other errors, fail the operation
             return Err(format!(
                 "Failed to create template for app_id {}: {}", 
                 app_id, 
-                result.message.unwrap_or("Unknown error".to_string())
+                error_message
             ));
         }
         
+        println!("Template created successfully for app_id: {}", app_id);
         successful += 1;
-        successful_app_ids.push(app_id);
+        successful_app_ids.push(app_id.clone());
     }
+    
+    println!("Bulk template creation completed: {}/{} successful, {} skipped (already exist)", 
+             successful, total, skipped);
     
     Ok(BulkCreateResult {
         successful,

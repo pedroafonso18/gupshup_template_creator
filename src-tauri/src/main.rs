@@ -2,5 +2,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
+    println!("==================================================");
+    println!("Starting WhatsApp Template Creator Application");
+    println!("==================================================");
     insert_templates_lib::run()
 }

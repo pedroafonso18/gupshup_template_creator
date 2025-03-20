@@ -1,4 +1,4 @@
-use sqlx::{Error, Pool, Postgres, Row};
+use sqlx::{Error, Postgres, PgConnection, Row};
 
 #[derive(Debug)]
 pub struct ConnectionData {
@@ -15,14 +15,17 @@ pub struct ConnectionData {
     pub facebook_token: Option<String>,
 }
 
-pub async fn fetch_connections(client: &Pool<Postgres>) -> Result<Vec<ConnectionData>,Error> {
+pub async fn fetch_connections(conn: &mut PgConnection) -> Result<Vec<ConnectionData>,Error> {
+    println!("Executing database query: SELECT * FROM parametros");
     let query = String::from(
         r#"SELECT * FROM parametros"#
     );
 
     let rows = sqlx::query(&query)
-        .fetch_all(client)
+        .fetch_all(conn)
         .await?;
+    
+    println!("Query executed successfully, fetched {} rows", rows.len());
     
     let mut connections_data: Vec<ConnectionData> = Vec::with_capacity(rows.len());
 
@@ -49,5 +52,6 @@ pub async fn fetch_connections(client: &Pool<Postgres>) -> Result<Vec<Connection
             facebook_token: get_opt_string("facebook_token"),
         });   
     }
+    println!("Processed {} connection records", connections_data.len());
     Ok(connections_data)
 }

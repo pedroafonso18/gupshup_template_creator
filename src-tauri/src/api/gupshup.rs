@@ -102,6 +102,7 @@ pub struct GupshupClient {
 
 impl GupshupClient {
     pub fn new(api_key: &str, session_cookie: &str) -> Self {
+        println!("Initializing GupshupClient with API key: {}", api_key);
         GupshupClient {
             client: Client::new(),
             base_url: "https://api.gupshup.io/wa/app".to_string(),
@@ -111,7 +112,8 @@ impl GupshupClient {
     }
 
     pub async fn upload_media(&self, app_id: &str, file_name: &str, file_data: Vec<u8>) -> Result<MediaResponse, String> {
-        let url = format!("https://api.gupshup.io/wa/api/v1/app/{}/media", app_id);
+        println!("Uploading media '{}' for app_id: {}, size: {} bytes", file_name, app_id, file_data.len());
+        let url = format!("https://api.gupshup.io/wa/{}/wa/media/v2", app_id);
         
         let part = reqwest::multipart::Part::bytes(file_data)
             .file_name(file_name.to_string())
@@ -120,6 +122,7 @@ impl GupshupClient {
         
         let form = reqwest::multipart::Form::new().part("file", part);
 
+        println!("Sending media upload request to: {}", url);
         let response = self.client
             .post(&url)
             .header("Cookie", format!("session={}", self.session_cookie))
@@ -133,12 +136,23 @@ impl GupshupClient {
             let error_text = response.text().await
                 .map_err(|e| format!("Error reading response: {}", e))?;
             
-            println!("Error uploading media: {}", error_text);
+            println!("Error uploading media: HTTP {}: {}", status, error_text);
             return Err(format!("HTTP error {}: {}", status, error_text));
         }
 
+        println!("Media upload response received, parsing...");
         let media_response = response.json::<MediaResponse>().await
             .map_err(|e| format!("Error parsing response: {}", e))?;
+        
+        if media_response.status == "success" {
+            if let Some(ref media) = media_response.media {
+                println!("Media uploaded successfully. ID: {}, URL: {}", media.id, media.url);
+            } else {
+                println!("Media upload successful but no media details returned");
+            }
+        } else {
+            println!("Media upload failed with status: {}", media_response.status);
+        }
         
         Ok(media_response)
     }
@@ -150,8 +164,12 @@ impl GupshupClient {
         image_data: Option<Vec<u8>>,
         image_name: Option<String>
     ) -> Result<GupshupResponse, String> {
+        println!("Creating template with image for app_id: {}, template: {}", 
+            app_id, template.element_name);
+            
         if let Some(data) = image_data {
             let file_name = image_name.unwrap_or_else(|| "image.jpg".to_string());
+            println!("Uploading image '{}' ({} bytes) for template", file_name, data.len());
             
             let media_response = self.upload_media(app_id, &file_name, data).await?;
             
@@ -173,11 +191,14 @@ impl GupshupClient {
 
     pub async fn create_template(&self, app_id: &str, template: TemplateRequest) -> Result<GupshupResponse, String> {
         let url = format!("{}/{}/template", self.base_url, app_id);
+        println!("Creating template '{}' for app_id: {} at URL: {}", 
+            template.element_name, app_id, url);
         
+        println!("Preparing form data for template creation");
         let mut form = HashMap::new();
         form.insert("elementName", template.element_name);
         form.insert("languageCode", template.language_code);
-        form.insert("content", template.content);
+        form.insert("content", template.content.clone());
         form.insert("category", match template.category {
             TemplateCategory::Marketing => "MARKETING".to_string(),
             TemplateCategory::Utility => "UTILITY".to_string(),
@@ -207,6 +228,7 @@ impl GupshupClient {
             form.insert("mediaUrl", media_url);
         }
 
+        println!("Sending template creation request with content: '{}'", template.content);
         let response = self.client
             .post(&url)
             .header("Content-Type", "application/x-www-form-urlencoded")
@@ -214,10 +236,22 @@ impl GupshupClient {
             .form(&form)
             .send()
             .await
-            .map_err(|e| format!("Request error: {}", e))?;
+            .map_err(|e| {
+                println!("Error sending template creation request: {}", e);
+                format!("Request error: {}", e)
+            })?;
 
+        let status = response.status();
+        println!("Received response with status: {}", status);
+        
         let gupshup_response = response.json::<GupshupResponse>().await
-            .map_err(|e| format!("Error parsing response: {}", e))?;
+            .map_err(|e| {
+                println!("Error parsing response: {}", e);
+                format!("Error parsing response: {}", e)
+            })?;
+        
+        println!("Template creation response: status={}, message={:?}", 
+            gupshup_response.status, gupshup_response.message);
         
         Ok(gupshup_response)
     }

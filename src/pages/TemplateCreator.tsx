@@ -132,9 +132,16 @@ const TemplateCreator: React.FC = () => {
   };
 
   const formatPreviewText = (text: string) => {
+    // Replace variables with example values and convert newlines to <br> tags for HTML display
     return text
       .replace(/\{\{name\}\}/g, "John")
-      .replace(/\{\{date\}\}/g, new Date().toLocaleDateString());
+      .replace(/\{\{date\}\}/g, new Date().toLocaleDateString())
+      .split('\n').map((line, index) => (
+        <React.Fragment key={index}>
+          {line}
+          {index < text.split('\n').length - 1 && <br />}
+        </React.Fragment>
+      ));
   };
 
   return (
@@ -273,6 +280,8 @@ const TemplateCreator: React.FC = () => {
               />
               <p className="variable-hint">
                 Use variáveis como &#123;&#123;1&#125;&#125; ou &#123;&#123;2&#125;&#125; para personalizar sua mensagem
+                <br />
+                Pressione Enter para adicionar quebras de linha
               </p>
             </div>
 
