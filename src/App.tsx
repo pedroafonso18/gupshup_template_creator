@@ -1,4 +1,3 @@
-import { useState } from "react";
 import TemplateCreator from "./pages/TemplateCreator";
 import "./App.css";
 

@@ -21,7 +21,6 @@ const TemplateCreator: React.FC = () => {
   const [bodyText, setBodyText] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [apiKey, setApiKey] = useState('');
   const [appId, setAppId] = useState('');
   const [vertical, setVertical] = useState('Template');
   const [creationMode, setCreationMode] = useState<CreationMode>('single');

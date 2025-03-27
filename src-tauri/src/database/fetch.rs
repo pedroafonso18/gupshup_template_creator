@@ -1,4 +1,4 @@
-use sqlx::{Error, Postgres, PgConnection, Row};
+use sqlx::{Error, PgConnection, Row};
 
 #[derive(Debug)]
 pub struct ConnectionData {

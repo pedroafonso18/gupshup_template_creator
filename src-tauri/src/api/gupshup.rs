@@ -1,10 +1,7 @@
-use reqwest::{Client, Error as ReqwestError, StatusCode};
+use reqwest::{Client};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::io::{Error as IoError, ErrorKind};
-use bytes::Bytes;
-use std::io::Cursor;
-use std::fmt;
+
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum TemplateCategory {
